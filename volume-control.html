@@ -1,0 +1,193 @@
+<link rel="import" href="../polymer/polymer.html">
+
+<dom-module id="volume-control">
+    <template>
+        <style>
+            label,
+            input {
+                display: block;
+                margin: 1em auto;
+                width: 300px;
+            }
+
+            input[type=range] {
+                -webkit-appearance: none;
+                border: 1px solid white;
+                width: 300px;
+            }
+
+            input[type=range]::-webkit-slider-runnable-track {
+                background: lightgrey;
+                border: none;
+                border-radius: 3px;
+                height: 5px;
+                width: 300px;
+            }
+
+            input[type=range]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                background: gold;
+                border: none;
+                border-radius: 50%;
+                height: 16px;
+                width: 16px;
+                margin-top: -4px;
+            }
+
+            input[type=range]:focus {
+                outline: none;
+            }
+
+            input[type=range]:focus::-webkit-slider-runnable-track {
+                background: #ccc;
+            }
+
+            input[type=range]::-moz-range-track {
+                background: lightgrey;
+                border: none;
+                border-radius: 3px;
+                height: 5px;
+                width: 300px;
+            }
+
+            input[type=range]::-moz-range-thumb {
+                background: gold;
+                border: none;
+                border-radius: 50%;
+                height: 16px;
+                width: 16px;
+            }
+
+            input[type=range]:-moz-focusring {
+                outline: 1px solid white;
+                outline-offset: -1px;
+            }
+
+            input[type=range]::-ms-track {
+                background: transparent;
+                border-color: transparent;
+                border-width: 6px 0;
+                color: transparent;
+                height: 5px;
+                width: 300px;
+            }
+
+            input[type=range]::-ms-fill-lower {
+                background: #777;
+                border-radius: 10px;
+            }
+
+            input[type=range]::-ms-fill-upper {
+                background: lightgrey;
+                border-radius: 10px;
+            }
+
+            input[type=range]::-ms-thumb {
+                background: gold;
+                border: none;
+                border-radius: 50%;
+                height: 16px;
+                width: 16px;
+            }
+
+            input[type=range]:focus::-ms-fill-lower {
+                background: #888;
+            }
+
+            input[type=range]:focus::-ms-fill-upper {
+                background: #ccc;
+            }
+        </style>
+
+        <label for="volume">
+            <svg xmlns="http://www.w3.org/2000/svg" height="100" width="300" viewBox="0 0 1 0.33" fill="lightgrey">
+                <title>Volume Indicator</title>
+                <defs>
+                    <clipPath id="triangle">
+                        <polygon points="0 0.33, 1 0.33, 1 0" />
+                    </clipPath>
+                </defs>
+                <polygon points="0 0.33, 1 0.33, 1 0" />
+                <rect id="rect" x="0" y="0" height="0.5" width="0.5" clip-path="url(#triangle)" fill="gold" />
+            </svg>
+        </label>
+
+        <input id="volume" type="range" name="volume" min="0" step="0.01" max="1" value="{{volume}}">
+    </template>
+
+    <script>
+        (function() {
+            var audioContext = new(window.AudioContext || window.webkitAudioContext)();
+
+            Polymer({
+                is: 'volume-control',
+
+                properties: {
+                    volume: {
+                        type: Number,
+                        notify: true,
+                        reflectToAttribute: true,
+                        value: 0.5
+                    }
+                },
+
+                listeners: {
+                    'input': '_handleChange',
+                    'change': '_handleChange'
+                },
+
+                ready: function() {
+                    if (audioContext) {
+                        this.ctx = new AudioContext();
+                        this.currGain = undefined;
+                        this.lastGain = 0;
+                        this.$.rect.setAttribute('width', this.volume);
+                    }
+                },
+
+                _handleChange: function(event) {
+                    this.$.rect.setAttribute('width', this.$.volume.value);
+                    this.volume = this.$.volume.value;
+                    this.fire('change-volume', {
+                        volume: this.volume
+                    });
+                    this._changeGain(event);
+                },
+
+                _changeGain: function(event) {
+                    if (event.target.value > 0) {
+                        this.currGain = event.target.value / 0.1;
+                    } else {
+                        this.currGain = 0;
+                    }
+
+                    if (this.lastGain !== this.currGain) {
+                        this._playOsc('triangle', 300, this.currGain, 0.05);
+                    }
+
+                    this.lastGain = this.currGain;
+                },
+
+                _playOsc: function(type, freq, vol, dur) {
+                    if (audioContext) {
+                        this.o = this.ctx.createOscillator();
+                        this.g = this.ctx.createGain();
+
+                        this.o.type = type;
+                        this.o.frequency.value = freq;
+
+                        this.o.start(this.ctx.currentTime);
+                        this.o.stop(this.ctx.currentTime + dur);
+
+                        this.g.gain.value = vol;
+                        this.g.gain.setValueAtTime(1, this.ctx.currentTime + dur - 0.01);
+                        this.g.gain.linearRampToValueAtTime(0, this.ctx.currentTime + dur);
+
+                        this.o.connect(this.g);
+                        this.g.connect(this.ctx.destination);
+                    }
+                }
+            });
+        }());
+    </script>
+</dom-module>
